@@ -13,7 +13,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -70,6 +74,104 @@ public class ProductServiceImpl implements ProductService {
         }
 
         productRepository.deleteById(id);
+    }
+
+    @Override
+    public List<ProductResponseDTO> searchProductsByName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Search name cannot be null or empty");
+        }
+        List<Product> products = productRepository.findByNameContainingIgnoreCase(name);
+        return products.stream()
+                .map(ProductMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductResponseDTO> getAvailableProducts() {
+        List<Product> products = productRepository.findByStockGreaterThan(0);
+        return products.stream()
+                .map(ProductMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductResponseDTO> getOutOfStockProducts() {
+        List<Product> products = productRepository.findByStockEquals(0);
+        return products.stream()
+                .map(ProductMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductResponseDTO> getProductsCheaperThan(BigDecimal price) {
+        validatePrice(price);
+        List<Product> products = productRepository.findByPriceLessThan(price);
+        return products.stream()
+                .map(ProductMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductResponseDTO> getProductsMoreExpensiveThan(BigDecimal price) {
+        validatePrice(price);
+        List<Product> products = productRepository.findByPriceGreaterThan(price);
+        return products.stream()
+                .map(ProductMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ProductResponseDTO> getProductsByPriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
+        validatePrice(minPrice);
+        validatePrice(maxPrice);
+        if (minPrice.compareTo(maxPrice) > 0) {
+            throw new IllegalArgumentException("Min price cannot be greater than max price");
+        }
+        List<Product> products = productRepository.findByPriceBetween(minPrice, maxPrice);
+        return products.stream()
+                .map(ProductMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public long countAllProducts() {
+        return productRepository.count();
+    }
+
+    @Override
+    public long countAvailableProducts() {
+        return productRepository.countByStockGreaterThan(0);
+    }
+
+    @Override
+    public long countProductsByName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("Name for count cannot be null or empty");
+        }
+        return productRepository.countByNameContainingIgnoreCase(name);
+    }
+
+    @Override
+    public Optional<ProductResponseDTO> getMostExpensiveProduct() {
+        List<Product> products = productRepository.findTop1ByOrderByPriceDesc();
+        return products.stream()
+                .findFirst()
+                .map(ProductMapper::toResponseDto);
+    }
+
+    @Override
+    public Optional<ProductResponseDTO> getCheapestProduct() {
+        List<Product> products = productRepository.findTop1ByOrderByPriceAsc();
+        return products.stream()
+                .findFirst()
+                .map(ProductMapper::toResponseDto);
+    }
+
+    private void validatePrice(BigDecimal price) {
+        if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Price must be non-null and non-negative");
+        }
     }
 
     private void validateId(Long id) {
